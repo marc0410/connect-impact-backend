@@ -1,0 +1,27 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Prisma (et certains binaires) ont besoin d'OpenSSL pour détecter/télécharger le bon engine.
+RUN apk add --no-cache openssl
+
+# Installer pnpm
+RUN npm install -g pnpm
+
+# Copier les fichiers de configuration
+COPY package.json pnpm-lock.yaml ./
+
+# Installer les dépendances
+RUN pnpm install --frozen-lockfile
+
+# Copier le reste du code source
+COPY . .
+
+# Générer le client Prisma
+RUN npx prisma generate
+
+# Exposer les ports
+EXPOSE 3000 9229
+
+# Commande de démarrage en mode développement avec rechargement automatique
+CMD ["pnpm", "start:dev"]

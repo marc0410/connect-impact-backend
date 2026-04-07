@@ -1,0 +1,68 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: connect_impact_postgres
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-connect_impact_db}
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres} -d ${DATABASE_NAME:-connect_impact_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - connect_impact_network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: connect_impact_api
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@postgres:5432/${DATABASE_NAME:-connect_impact_db}
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=${DATABASE_USER:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-postgres}
+      - DATABASE_NAME=${DATABASE_NAME:-connect_impact_db}
+      - JWT_SECRET=${JWT_SECRET:-your_super_secret_jwt_key_here_change_this_in_production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - APP_PORT=${APP_PORT:-3000}
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USER=kankoffi36@gmail.com
+      - MAIL_PASS=rejb loni fjaw oplm
+      - MAIL_FROM=no-reply@immoplus.ci
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+      - "9229:9229"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - connect_impact_network
+    restart: unless-stopped
+    command: sh scripts/docker-dev.sh
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  connect_impact_network:
+    driver: bridge

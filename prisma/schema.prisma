@@ -1,0 +1,343 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════
+
+enum Role {
+  admin
+  responsable
+  blog_manager
+  applicant
+  member
+}
+
+enum AccountStatus {
+  pending_invitation
+  active
+  suspended
+  inactive
+}
+
+enum MembershipStatus {
+  pending
+  approved
+  rejected
+  suspended
+}
+
+enum MembershipType {
+  actif
+  bienfaiteur
+  honoraire
+  sympathisant
+}
+
+enum Gender {
+  homme
+  femme
+  non_binaire
+  prefere_ne_pas_dire
+}
+
+enum EducationLevel {
+  college
+  lycee
+  bac
+  bac_plus_2
+  bac_plus_3
+  bac_plus_5
+  doctorat
+  autre
+}
+
+enum EmploymentStatus {
+  etudiant
+  employe
+  independant
+  demandeur_emploi
+  retraite
+  autre
+}
+
+enum Availability {
+  temps_plein
+  mi_temps
+  weekends
+  ponctuel
+}
+
+enum ArticleCategory {
+  actualite
+  guide
+  temoignage
+  partenariat
+  evenement
+  rapport
+}
+
+enum ArticleStatus {
+  draft
+  published
+  archived
+}
+
+enum OpportunityType {
+  stage
+  emploi
+  formation
+  benevolat
+  freelance
+  volontariat
+}
+
+enum ContractType {
+  cdi
+  cdd
+  stage
+  freelance
+  benevole
+  volontaire
+}
+
+enum OpportunityStatus {
+  draft
+  published
+  closed
+  expired
+}
+
+enum Sector {
+  education
+  environnement
+  sante
+  culture
+  numerique
+  humanitaire
+  sport
+  autre
+}
+
+enum ApplicationStatus {
+  submitted
+  viewed
+  shortlisted
+  rejected
+  accepted
+}
+
+// ═══════════════════════════════════════════════
+// MODELS
+// ═══════════════════════════════════════════════
+
+model User {
+  id                       String        @id @default(uuid())
+  email                    String        @unique
+  username                 String?       @unique
+  password                 String
+  role                     Role          @default(member)
+  accountStatus            AccountStatus @default(pending_invitation)
+  invitationToken          String?
+  invitationTokenExpiresAt DateTime?
+  isFirstLogin             Boolean       @default(true)
+  lastLoginAt              DateTime?
+  refreshToken             String?
+  createdById              String?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  createdBy              User?          @relation("UserCreatedBy", fields: [createdById], references: [id])
+  createdUsers           User[]         @relation("UserCreatedBy")
+  memberProfile          MemberProfile?
+  membership             Membership?    @relation("MemberUser")
+  reviewedMemberships    Membership[]   @relation("ReviewedBy")
+  articles               Article[]
+  comments               Comment[]
+  opportunities          Opportunity[]
+  applications           Application[]
+
+  @@map("users")
+}
+
+model Membership {
+  id                      String           @id @default(uuid())
+  firstName               String
+  lastName                String
+  email                   String
+  phone                   String?
+  dateOfBirth             DateTime
+  gender                  Gender?
+  nationality             String?
+  address                 Json
+  profile                 Json?
+  profession              String?
+  educationLevel          EducationLevel?
+  currentEmploymentStatus EmploymentStatus?
+  motivationLetter        String
+  skills                  String[]
+  availability            Availability
+  hoursPerWeek            Int?
+  hasVolunteeredBefore    Boolean           @default(false)
+  previousExperience      String?
+  agreesToStatutes        Boolean
+  agreesToPrivacyPolicy   Boolean
+  agreesToCodeOfConduct   Boolean
+  status                  MembershipStatus  @default(pending)
+  membershipNumber        String?           @unique
+  membershipType          MembershipType    @default(actif)
+  membershipStartDate     DateTime?
+  membershipEndDate       DateTime?
+  reviewedById            String?
+  reviewedAt              DateTime?
+  rejectionReason         String?
+  internalNotes           String?
+  userId                  String?           @unique
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  reviewedBy    User?          @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  user          User?          @relation("MemberUser", fields: [userId], references: [id])
+  memberProfile MemberProfile?
+
+  @@map("memberships")
+}
+
+model MemberProfile {
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  membershipId      String         @unique
+  membershipNumber  String
+  firstName         String
+  lastName          String
+  avatarUrl         String?
+  bio               String?
+  phone             String?
+  city              String?
+  country           String?
+  skills            String[]
+  languages         String[]
+  interests         String[]
+  linkedinUrl       String?
+  membershipType    MembershipType
+  memberSince       DateTime
+  membershipEndDate DateTime?
+  membershipStatus  String         @default("active")
+  isProfileComplete Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id])
+  membership Membership @relation(fields: [membershipId], references: [id])
+
+  @@map("member_profiles")
+}
+
+model Article {
+  id                 String          @id @default(uuid())
+  title              String
+  slug               String          @unique
+  excerpt            String
+  content            String
+  coverImageUrl      String?
+  authorId           String
+  category           ArticleCategory
+  tags               String[]
+  status             ArticleStatus   @default(draft)
+  isFeatured         Boolean         @default(false)
+  publishedAt        DateTime?
+  readingTimeMinutes Int?
+  viewsCount         Int             @default(0)
+  metaTitle          String?
+  metaDescription    String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  author   User      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+
+  @@map("articles")
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  articleId  String
+  authorId   String
+  content    String
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+
+  @@map("comments")
+}
+
+model Opportunity {
+  id                     String            @id @default(uuid())
+  publisherId            String
+  type                   OpportunityType
+  title                  String
+  organizationName       String
+  organizationLogoUrl    String?
+  location               Json
+  description            String
+  missions               String[]
+  profileRequired        String
+  contractType           ContractType?
+  duration               String?
+  startDate              DateTime?
+  applicationDeadline    DateTime?
+  salary                 Json?
+  workingHours           String?
+  benefits               String[]
+  requiredSkills         String[]
+  preferredSkills        String[]
+  educationLevel         EducationLevel?
+  experienceLevel        String?
+  languages              String[]
+  status                 OpportunityStatus @default(draft)
+  isUrgent               Boolean           @default(false)
+  isFeatured             Boolean           @default(false)
+  tags                   String[]
+  sector                 Sector
+  applicationUrl         String?
+  applicationEmail       String?
+  applicationInstructions String?
+  viewsCount             Int               @default(0)
+  applicationsCount      Int               @default(0)
+  publishedAt            DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  publisher    User          @relation(fields: [publisherId], references: [id])
+  applications Application[]
+
+  @@map("opportunities")
+}
+
+model Application {
+  id            String            @id @default(uuid())
+  opportunityId String
+  applicantId   String
+  coverLetter   String?
+  resumeUrl     String?
+  linkedinUrl   String?
+  status        ApplicationStatus @default(submitted)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  applicant   User        @relation(fields: [applicantId], references: [id])
+
+  @@unique([opportunityId, applicantId])
+  @@map("applications")
+}
