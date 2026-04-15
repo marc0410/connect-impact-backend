@@ -74,15 +74,6 @@ enum Availability {
   ponctuel
 }
 
-enum ArticleCategory {
-  actualite
-  guide
-  temoignage
-  partenariat
-  evenement
-  rapport
-}
-
 enum ArticleStatus {
   draft
   published
@@ -133,6 +124,41 @@ enum ApplicationStatus {
   accepted
 }
 
+enum PostType {
+  opportunity
+  bonplan
+  resource
+}
+
+enum PostStatus {
+  draft
+  published
+  archived
+  expired
+}
+
+enum EventType {
+  webinaire
+  debat
+  atelier
+  formation_directe
+  conference
+  networking
+}
+
+enum EventStatus {
+  draft
+  upcoming
+  ongoing
+  completed
+  cancelled
+}
+
+enum EventRegistrationStatus {
+  confirmed
+  cancelled
+}
+
 // ═══════════════════════════════════════════════
 // MODELS
 // ═══════════════════════════════════════════════
@@ -153,21 +179,30 @@ model User {
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
-  createdBy              User?          @relation("UserCreatedBy", fields: [createdById], references: [id])
-  createdUsers           User[]         @relation("UserCreatedBy")
-  memberProfile          MemberProfile?
-  membership             Membership?    @relation("MemberUser")
-  reviewedMemberships    Membership[]   @relation("ReviewedBy")
-  articles               Article[]
-  comments               Comment[]
-  opportunities          Opportunity[]
-  applications           Application[]
+  createdBy           User?          @relation("UserCreatedBy", fields: [createdById], references: [id])
+  createdUsers        User[]         @relation("UserCreatedBy")
+  memberProfile       MemberProfile?
+  membership          Membership?    @relation("MemberUser")
+  reviewedMemberships Membership[]   @relation("ReviewedBy")
+  articles            Article[]
+  comments            Comment[]
+  opportunities       Opportunity[]
+  applications        Application[]
+  blogLikes           BlogLike[]
+  posts               Post[]
+  postComments        PostComment[]
+  postSaves           PostSave[]
+  postLikes           PostLike[]
+  events              Event[]
+  eventRegistrations  EventRegistration[]
+  eventSaves          EventSave[]
+  eventLikes          EventLike[]
 
   @@map("users")
 }
 
 model Membership {
-  id                      String           @id @default(uuid())
+  id                      String            @id @default(uuid())
   firstName               String
   lastName                String
   email                   String
@@ -240,82 +275,124 @@ model MemberProfile {
 }
 
 model Article {
-  id                 String          @id @default(uuid())
-  title              String
-  slug               String          @unique
-  excerpt            String
-  content            String
-  coverImageUrl      String?
-  authorId           String
-  category           ArticleCategory
-  tags               String[]
-  status             ArticleStatus   @default(draft)
-  isFeatured         Boolean         @default(false)
-  publishedAt        DateTime?
-  readingTimeMinutes Int?
-  viewsCount         Int             @default(0)
-  metaTitle          String?
-  metaDescription    String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id              String        @id @default(uuid())
+  title           String
+  slug            String        @unique
+  excerpt         String
+  content         Json
+  coverImageId    String?       @unique
+  authorId        String
+  category        String
+  tags            String[]
+  status          ArticleStatus @default(draft)
+  isFeatured      Boolean       @default(false)
+  publishedAt     DateTime?
+  readTime        String?
+  views           Int           @default(0)
+  likes           Int           @default(0)
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  author   User      @relation(fields: [authorId], references: [id])
-  comments Comment[]
+  author     User        @relation(fields: [authorId], references: [id])
+  coverImage BlogImage?  @relation("ArticleCover", fields: [coverImageId], references: [id])
+  images     BlogImage[] @relation("ArticleImages")
+  comments   Comment[]
+  blogLikes  BlogLike[]
 
   @@map("articles")
 }
 
-model Comment {
-  id         String   @id @default(uuid())
-  articleId  String
-  authorId   String
-  content    String
-  isApproved Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model BlogImage {
+  id        String   @id @default(uuid())
+  url       String
+  publicId  String
+  alt       String
+  caption   String?
+  width     Int
+  height    Int
+  size      Int
+  mimeType  String
+  order     Int      @default(0)
+  articleId String?
+  createdAt DateTime @default(now())
 
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  author  User    @relation(fields: [authorId], references: [id])
+  article  Article? @relation("ArticleImages", fields: [articleId], references: [id], onDelete: SetNull)
+  coverFor Article? @relation("ArticleCover")
+
+  @@map("blog_images")
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  articleId   String
+  authorId    String?
+  authorName  String
+  authorEmail String?
+  content     String
+  likes       Int      @default(0)
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  article Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  author  User?    @relation(fields: [authorId], references: [id])
+  parent  Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
 
   @@map("comments")
 }
 
+model BlogLike {
+  id        String   @id @default(uuid())
+  articleId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, userId])
+  @@map("blog_likes")
+}
+
 model Opportunity {
-  id                     String            @id @default(uuid())
-  publisherId            String
-  type                   OpportunityType
-  title                  String
-  organizationName       String
-  organizationLogoUrl    String?
-  location               Json
-  description            String
-  missions               String[]
-  profileRequired        String
-  contractType           ContractType?
-  duration               String?
-  startDate              DateTime?
-  applicationDeadline    DateTime?
-  salary                 Json?
-  workingHours           String?
-  benefits               String[]
-  requiredSkills         String[]
-  preferredSkills        String[]
-  educationLevel         EducationLevel?
-  experienceLevel        String?
-  languages              String[]
-  status                 OpportunityStatus @default(draft)
-  isUrgent               Boolean           @default(false)
-  isFeatured             Boolean           @default(false)
-  tags                   String[]
-  sector                 Sector
-  applicationUrl         String?
-  applicationEmail       String?
+  id                      String            @id @default(uuid())
+  publisherId             String
+  type                    OpportunityType
+  title                   String
+  organizationName        String
+  organizationLogoUrl     String?
+  location                Json
+  description             String
+  missions                String[]
+  profileRequired         String
+  contractType            ContractType?
+  duration                String?
+  startDate               DateTime?
+  applicationDeadline     DateTime?
+  salary                  Json?
+  workingHours            String?
+  benefits                String[]
+  requiredSkills          String[]
+  preferredSkills         String[]
+  educationLevel          EducationLevel?
+  experienceLevel         String?
+  languages               String[]
+  status                  OpportunityStatus @default(draft)
+  isUrgent                Boolean           @default(false)
+  isFeatured              Boolean           @default(false)
+  tags                    String[]
+  sector                  Sector
+  applicationUrl          String?
+  applicationEmail        String?
   applicationInstructions String?
-  viewsCount             Int               @default(0)
-  applicationsCount      Int               @default(0)
-  publishedAt            DateTime?
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  viewsCount              Int               @default(0)
+  applicationsCount       Int               @default(0)
+  publishedAt             DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
 
   publisher    User          @relation(fields: [publisherId], references: [id])
   applications Application[]
@@ -340,4 +417,212 @@ model Application {
 
   @@unique([opportunityId, applicantId])
   @@map("applications")
+}
+
+// ═══════════════════════════════════════════════
+// POSTS (Opportunités, Bons Plans, Ressources)
+// ═══════════════════════════════════════════════
+
+model Post {
+  id              String    @id @default(uuid())
+  type            PostType
+  title           String
+  slug            String    @unique
+  excerpt         String?
+  description     String
+  category        String
+  domain          String?
+  tags            String[]
+  featured        Boolean   @default(false)
+  status          PostStatus @default(draft)
+  viewsCount      Int       @default(0)
+  savesCount      Int       @default(0)
+  likesCount      Int       @default(0)
+  postedAt        DateTime?
+  expiresAt       DateTime?
+  validUntil      DateTime?
+  publishedAt     DateTime?
+  publisherId     String
+  submittedBy     Json?     // { userId: string, name: string }
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Type-specific fields stored as JSON
+  opportunityData Json?     // Opportunity-specific fields
+  bonplanData     Json?     // BonPlan-specific fields
+  resourceData    Json?     // Resource-specific fields
+
+  publisher   User           @relation(fields: [publisherId], references: [id])
+  images      PostImage[]
+  comments    PostComment[]
+  saves       PostSave[]
+  likes       PostLike[]
+
+  @@map("posts")
+}
+
+model PostImage {
+  id        String   @id @default(uuid())
+  postId    String?
+  url       String
+  publicId  String
+  alt       String
+  caption   String?
+  width     Int
+  height    Int
+  size      Int
+  mimeType  String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_images")
+}
+
+model PostComment {
+  id          String   @id @default(uuid())
+  postId      String
+  authorId    String?
+  authorName  String
+  authorEmail String?
+  content     String
+  likes       Int      @default(0)
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post    Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User?        @relation(fields: [authorId], references: [id])
+  parent  PostComment? @relation("PostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies PostComment[] @relation("PostCommentReplies")
+
+  @@map("post_comments")
+}
+
+model PostSave {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_saves")
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("post_likes")
+}
+
+// ═══════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════
+
+model Event {
+  id              String   @id @default(uuid())
+  type            EventType
+  title           String
+  slug            String   @unique
+  description     String
+  content         Json?    // ContentBlock[]
+  organizerId     String
+  startAt         DateTime
+  endAt           DateTime
+  timezone        String?
+  meetingUrl      String
+  capacity        Int?     // -1 for unlimited
+  registeredCount Int      @default(0)
+  domain          String?
+  tags            String[]
+  language        String?  // "FR" | "EN" | "BILINGUAL"
+  featured        Boolean  @default(false)
+  status          EventStatus @default(draft)
+  viewsCount      Int      @default(0)
+  savesCount      Int      @default(0)
+  likesCount      Int      @default(0)
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organizer       User                 @relation(fields: [organizerId], references: [id])
+  speakers        EventSpeaker[]
+  registrations   EventRegistration[]
+  saves           EventSave[]
+  likes           EventLike[]
+
+  @@map("events")
+}
+
+model EventSpeaker {
+  id          String   @id @default(uuid())
+  eventId     String
+  name        String
+  bio         String?
+  role        String?
+  company     String?
+  avatarUrl   String?
+  linkedinUrl String?
+  order       Int?
+  createdAt   DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_speakers")
+}
+
+model EventRegistration {
+  id                 String                   @id @default(uuid())
+  eventId            String
+  userId             String?
+  email              String
+  firstName          String
+  lastName           String
+  company            String?
+  status             EventRegistrationStatus @default(confirmed)
+  attendanceConfirmed Boolean?
+  registeredAt       DateTime                 @default(now())
+  createdAt          DateTime                 @default(now())
+
+  event Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("event_registrations")
+}
+
+model EventSave {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_saves")
+}
+
+model EventLike {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_likes")
 }
