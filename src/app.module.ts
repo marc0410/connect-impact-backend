@@ -9,6 +9,9 @@ import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { ProfileModule } from './profile/profile.module';
 import { MembershipModule } from './membership/membership.module';
 import { PrismaModule } from './config/prisma.module';
+import { UploadModule } from './upload/upload.module';
+import { PostsModule } from './posts/posts.module';
+import { EventsModule } from './events/events.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -24,6 +27,9 @@ import { RolesGuard } from './common/guards/roles.guard';
     OpportunitiesModule,
     ProfileModule,
     MembershipModule,
+    UploadModule,
+    PostsModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [

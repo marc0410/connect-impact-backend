@@ -25,13 +25,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import { BlogService } from './blog.service';
-import { CreateBlogDto } from './dto/create-blog.dto';
-import { UpdateBlogDto } from './dto/update-blog.dto';
-import { BlogQueryDto } from './dto/blog-query.dto';
+import { PostsService } from './posts.service';
+import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { PostsQueryDto } from './dto/posts-query.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UploadImageDto } from './dto/upload-image.dto';
-import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -58,76 +57,80 @@ const IMAGES_INTERCEPTOR = FilesInterceptor('files[]', 10, {
   },
 });
 
-@ApiTags('Blog')
-@Controller('blog')
-export class BlogController {
-  constructor(private readonly blogService: BlogService) {}
+@ApiTags('Posts')
+@Controller('posts')
+export class PostsController {
+  constructor(private readonly postsService: PostsService) {}
 
-  // ── Articles ────────────────────────────────────────────────────────────────
+  // ── Posts ────────────────────────────────────────────────────────────────────
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Lister les articles (paginé, filtrable)' })
-  findAll(@Query() query: BlogQueryDto, @CurrentUser() user?: any) {
+  @ApiOperation({ summary: 'Lister les posts (Opportunités, Bons Plans, Ressources)' })
+  findAll(@Query() query: PostsQueryDto, @CurrentUser() user?: any) {
     const isAdmin = user?.role === 'admin' || user?.role === 'responsable' || user?.role === 'blog_manager';
-    return this.blogService.findAll(query, isAdmin);
-  }
-
-  @Get('categories')
-  @Public()
-  @ApiOperation({ summary: "Lister les catégories avec leur nombre d'articles" })
-  getCategories() {
-    return this.blogService.getCategories();
+    return this.postsService.findAll(query, isAdmin);
   }
 
   @Get('slug/:slug')
   @Public()
-  @ApiOperation({ summary: 'Récupérer un article par son slug' })
-  @ApiQuery({ name: 'preview', required: false, type: Boolean })
-  findBySlug(@Param('slug') slug: string, @Query('preview') preview?: string, @CurrentUser() user?: any) {
-    const canPreview = user?.role === 'admin' || user?.role === 'responsable' || user?.role === 'blog_manager';
-    return this.blogService.findBySlug(slug, canPreview && preview === 'true');
+  @ApiOperation({ summary: 'Récupérer un post par son slug' })
+  findBySlug(@Param('slug') slug: string) {
+    return this.postsService.findBySlug(slug);
   }
 
   @Get(':id')
   @Public()
-  @ApiOperation({ summary: 'Récupérer un article complet par ID' })
-  @ApiQuery({ name: 'preview', required: false, type: Boolean })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @Query('preview') preview?: string, @CurrentUser() user?: any) {
-    const canPreview = user?.role === 'admin' || user?.role === 'responsable' || user?.role === 'blog_manager';
-    return this.blogService.findOne(id, canPreview && preview === 'true');
+  @ApiOperation({ summary: 'Récupérer un post complet par ID' })
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.postsService.findOne(id);
   }
 
   @Post()
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Créer un article (admin)' })
-  create(@Body() dto: CreateBlogDto) {
-    return this.blogService.create(dto);
+  @ApiOperation({ summary: 'Créer un post (admin)' })
+  create(@Body() dto: CreatePostDto, @CurrentUser() user: any) {
+    return this.postsService.create(dto, user.id);
   }
 
   @Patch(':id')
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Modifier un article (admin)' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateBlogDto) {
-    return this.blogService.update(id, dto);
+  @ApiOperation({ summary: 'Modifier un post (admin)' })
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePostDto) {
+    return this.postsService.update(id, dto);
   }
 
   @Delete(':id')
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Supprimer un article + images + commentaires (admin)' })
+  @ApiOperation({ summary: 'Supprimer un post (admin)' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.blogService.remove(id);
+    return this.postsService.remove(id);
   }
 
-  // ── Images ──────────────────────────────────────────────────────────────────
+  @Post('submit')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Soumettre un post en tant que membre' })
+  submit(@Body() dto: CreatePostDto, @CurrentUser() user: any) {
+    return this.postsService.submitPost(dto, user.id);
+  }
 
-  @Post('images')
+  @Patch(':id/review')
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Upload une image (admin)' })
+  @ApiOperation({ summary: 'Valider ou rejeter une soumission (admin)' })
+  review(@Param('id', ParseUUIDPipe) id: string, @Body() body: any) {
+    return this.postsService.reviewSubmission(id, body.action, body);
+  }
+
+  // ── Images ───────────────────────────────────────────────────────────────────
+
+  @Post(':id/images')
+  @Roles('admin', 'responsable', 'blog_manager')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Uploader une image (admin)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -136,21 +139,20 @@ export class BlogController {
         file: { type: 'string', format: 'binary' },
         alt: { type: 'string' },
         caption: { type: 'string' },
-        postId: { type: 'string', format: 'uuid' },
       },
       required: ['file', 'alt'],
     },
   })
   @UseInterceptors(IMAGE_INTERCEPTOR)
-  uploadImage(@UploadedFile() file: Express.Multer.File, @Body() dto: UploadImageDto) {
+  uploadImage(@UploadedFile() file: Express.Multer.File, @Body() dto: UploadImageDto, @Param('id', ParseUUIDPipe) postId: string) {
     if (!file) throw new BadRequestException('Fichier manquant');
-    return this.blogService.uploadImage(file, dto);
+    return this.postsService.uploadImage(file, { ...dto, postId });
   }
 
   @Post('images/batch')
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Upload plusieurs images en une fois (max 10) (admin)' })
+  @ApiOperation({ summary: 'Uploader plusieurs images (max 10) (admin)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -168,73 +170,82 @@ export class BlogController {
     @Body('postId') postId?: string,
   ) {
     if (!files?.length) throw new BadRequestException('Aucun fichier reçu');
-    return this.blogService.uploadImages(files, postId);
+    return this.postsService.uploadImages(files, postId);
   }
 
   @Get(':id/images')
   @Public()
-  @ApiOperation({ summary: "Lister les images d'un article (cover + corps)" })
+  @ApiOperation({ summary: 'Lister les images d\'un post' })
   getImages(@Param('id', ParseUUIDPipe) id: string) {
-    return this.blogService.getImages(id);
-  }
-
-  @Patch(':id/images/order')
-  @Roles('admin', 'responsable', 'blog_manager')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Réordonner les images du corps (admin)' })
-  reorderImages(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderImagesDto) {
-    return this.blogService.reorderImages(id, dto);
+    return this.postsService.getImages(id);
   }
 
   @Delete('images/:imageId')
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Supprimer une image du CDN et du contenu (admin)' })
+  @ApiOperation({ summary: 'Supprimer une image (admin)' })
   deleteImage(@Param('imageId', ParseUUIDPipe) imageId: string) {
-    return this.blogService.deleteImage(imageId);
+    return this.postsService.deleteImage(imageId);
   }
 
-  // ── Likes ───────────────────────────────────────────────────────────────────
+  // ── Engagement ───────────────────────────────────────────────────────────────
+
+  @Post(':id/saves')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Sauvegarder/Retirer des favoris (toggle)' })
+  toggleSave(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
+    return this.postsService.toggleSave(id, user.id);
+  }
 
   @Post(':id/likes')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Liker / Unliker un article (toggle)' })
+  @ApiOperation({ summary: 'Liker/Unliker un post (toggle)' })
   toggleLike(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
-    return this.blogService.toggleLike(id, user.id);
+    return this.postsService.toggleLike(id, user.id);
   }
 
   // ── Comments ─────────────────────────────────────────────────────────────────
 
   @Get(':id/comments')
   @Public()
-  @ApiOperation({ summary: 'Lister les commentaires (paginé, avec replies)' })
+  @ApiOperation({ summary: 'Lister les commentaires (paginé)' })
   getComments(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('perPage', new DefaultValuePipe(20), ParseIntPipe) perPage: number,
   ) {
-    return this.blogService.getComments(id, page, perPage);
+    return this.postsService.getComments(id, page, perPage);
   }
 
   @Post(':id/comments')
   @Public()
-  @ApiOperation({ summary: 'Ajouter un commentaire (ou une réponse)' })
+  @ApiOperation({ summary: 'Ajouter un commentaire' })
   addComment(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateCommentDto,
     @CurrentUser() user?: any,
   ) {
-    return this.blogService.addComment(id, dto, user?.id);
+    return this.postsService.addComment(id, dto, user?.id);
   }
 
   @Delete(':postId/comments/:commentId')
   @Roles('admin', 'responsable', 'blog_manager')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Supprimer un commentaire + ses replies (admin)' })
+  @ApiOperation({ summary: 'Supprimer un commentaire (admin)' })
   deleteComment(
     @Param('postId', ParseUUIDPipe) postId: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
   ) {
-    return this.blogService.deleteComment(postId, commentId);
+    return this.postsService.deleteComment(postId, commentId);
+  }
+
+  // ── Statistics ───────────────────────────────────────────────────────────────
+
+  @Get(':id/stats')
+  @Roles('admin', 'responsable', 'blog_manager')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Obtenir les statistiques d\'un post (admin)' })
+  getStats(@Param('id', ParseUUIDPipe) id: string) {
+    return this.postsService.getStats(id);
   }
 }
