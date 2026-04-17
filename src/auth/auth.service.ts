@@ -348,7 +348,7 @@ export class AuthService {
   // UTILS
   // ═══════════════════════════════════════════════
 
-  async getMe(userId: string, include?: string) {
+  async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -360,32 +360,45 @@ export class AuthService {
         isFirstLogin: true,
         lastLoginAt: true,
         createdAt: true,
+        membership: {
+          select: {
+            id: true,
+            status: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            dateOfBirth: true,
+            gender: true,
+            nationality: true,
+            address: true,
+            profile: true,
+            profession: true,
+            educationLevel: true,
+            currentEmploymentStatus: true,
+            hasVolunteeredBefore: true,
+            previousExperience: true,
+            motivationLetter: true,
+            skills: true,
+            availability: true,
+            hoursPerWeek: true,
+            agreesToStatutes: true,
+            agreesToPrivacyPolicy: true,
+            agreesToCodeOfConduct: true,
+            membershipNumber: true,
+            membershipType: true,
+            membershipStartDate: true,
+            membershipEndDate: true,
+            rejectionReason: true,
+            reviewedAt: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
-    }
-
-    const includes = (include || '')
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
-
-    if (includes.includes('membership') || includes.includes('membershipSummary')) {
-      const membership = await this.prisma.membership.findUnique({
-        where: { userId: user.id },
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          reviewedAt: true,
-          membershipNumber: true,
-          membershipType: true,
-        },
-      });
-
-      return { ...user, membership };
     }
 
     return user;

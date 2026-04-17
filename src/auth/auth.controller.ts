@@ -70,8 +70,8 @@ export class AuthController {
   @Get('me')
   @ApiOperation({ summary: 'Récupérer l\'utilisateur connecté' })
   @ApiBearerAuth('access-token')
-  async getMe(@CurrentUser() user: any, @Query('include') include?: string) {
-    return this.authService.getMe(user.id, include);
+  async getMe(@CurrentUser() user: any) {
+    return this.authService.getMe(user.id);
   }
 
   @Patch('change-password')
