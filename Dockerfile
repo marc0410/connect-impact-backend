@@ -30,10 +30,14 @@ COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile && \
     npx prisma generate && \
     pnpm prune --prod && \
-    pnpm store prune
+    pnpm store prune && \
+    npm install -g prisma@5.22.0 --no-update-notifier
 
 COPY --from=builder /app/dist ./dist
 
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["sh", "entrypoint.sh"]
