@@ -224,6 +224,7 @@ model Membership {
   agreesToStatutes        Boolean
   agreesToPrivacyPolicy   Boolean
   agreesToCodeOfConduct   Boolean
+  groupEngagement         Json?
   status                  MembershipStatus  @default(pending)
   membershipNumber        String?           @unique
   membershipType          MembershipType    @default(actif)

@@ -160,6 +160,34 @@ class ConsentsDto {
   agreesToCodeOfConduct: boolean;
 }
 
+const VALID_ACTIVITIES = [
+  'debats_groupe',
+  'formations_en_ligne',
+  'reseautage_day',
+  'partage_ressources',
+] as const;
+
+class GroupEngagementDto {
+  @IsBoolean()
+  willingToParticipate: boolean;
+
+  @IsBoolean()
+  understandsInactivePolicy: boolean;
+
+  @IsArray()
+  @IsIn(VALID_ACTIVITIES, { each: true })
+  interestedActivities: string[];
+
+  @IsString()
+  proposedActivities: string;
+
+  @IsBoolean()
+  willingToShare: boolean;
+
+  @IsBoolean()
+  willingToFollowSocial: boolean;
+}
+
 export class SubmitMembershipDto {
   @ValidateNested()
   @Type(() => IdentityDto)
@@ -191,11 +219,15 @@ export class SubmitMembershipDto {
   @Type(() => ConsentsDto)
   consents: ConsentsDto;
 
-  @IsNumberString()
-  @Length(6, 6)
-  password: string; // code 6 chiffres
+  @ValidateNested()
+  @Type(() => GroupEngagementDto)
+  groupEngagement: GroupEngagementDto;
 
   @IsNumberString()
   @Length(6, 6)
-  passwordConfirm: string; // confirmation du code
+  password: string;
+
+  @IsNumberString()
+  @Length(6, 6)
+  passwordConfirm: string;
 }

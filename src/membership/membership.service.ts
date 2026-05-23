@@ -83,7 +83,6 @@ export class MembershipService {
       throw new BadRequestException('Les codes ne correspondent pas');
     }
 
-    // Valider les consentements
     if (
       !dto.consents.agreesToStatutes ||
       !dto.consents.agreesToPrivacyPolicy ||
@@ -91,6 +90,12 @@ export class MembershipService {
     ) {
       throw new BadRequestException(
         'Vous devez accepter tous les consentements',
+      );
+    }
+
+    if (!dto.groupEngagement.understandsInactivePolicy) {
+      throw new BadRequestException(
+        'Vous devez confirmer avoir compris la politique d\'inactivité',
       );
     }
 
@@ -173,6 +178,7 @@ export class MembershipService {
           agreesToStatutes: dto.consents.agreesToStatutes,
           agreesToPrivacyPolicy: dto.consents.agreesToPrivacyPolicy,
           agreesToCodeOfConduct: dto.consents.agreesToCodeOfConduct,
+          groupEngagement: dto.groupEngagement as unknown as Prisma.InputJsonValue,
           status: 'pending',
           userId: user.id,
         },
